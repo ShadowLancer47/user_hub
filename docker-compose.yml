@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=userhub
+      - POSTGRES_PASSWORD=userhub_secret
+      - POSTGRES_DB=userhub_db
+    ports:
+      - "5432:5432"
+
+  web:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://userhub:userhub_secret@db/userhub_db
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

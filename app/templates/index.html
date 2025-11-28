@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h2 class="text-center mb-4">Login</h2>
+            {% if request.query_params.get("error") %}
+            <div class="alert alert-danger">{{ request.query_params.get("error") }}</div>
+            {% endif %}
+            {% if request.query_params.get("msg") %}
+            <div class="alert alert-success">{{ request.query_params.get("msg") }}</div>
+            {% endif %}
+
+            <form action="/auth/login" method="post">
+                <div class="mb-3">
+                    <label>Username</label>
+                    <input type="text" name="username" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label>Password</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Login</button>
+            </form>
+
+            <hr>
+
+            <h4 class="text-center mt-4">Register</h4>
+            <form action="/auth/register" method="post">
+                <div class="mb-3">
+                    <label>Username</label>
+                    <input type="text" name="username" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label>Email</label>
+                    <input type="email" name="email" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label>Password</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-success w-100">Sign Up</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

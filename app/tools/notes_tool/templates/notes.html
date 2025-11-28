@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>My Notes</h1>
+<a href="/dashboard" class="btn btn-secondary mb-3">Back to Dashboard</a>
+
+<div class="card p-3 mb-4">
+    <form action="/tools/notes/add" method="post">
+        <div class="input-group">
+            <input type="text" name="content" class="form-control" placeholder="Write a note..." required>
+            <button class="btn btn-primary" type="submit">Add Note</button>
+        </div>
+    </form>
+</div>
+
+<div class="list-group">
+    {% for note in notes %}
+    <div class="list-group-item">
+        {{ note }}
+    </div>
+    {% else %}
+    <div class="alert alert-info">No notes yet.</div>
+    {% endfor %}
+</div>
+{% endblock %}
