@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style>
+    .converter-container {
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 30px;
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .upload-area {
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        padding: 40px;
+        cursor: pointer;
+        transition: border-color 0.3s;
+        margin-bottom: 20px;
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    .upload-area:hover {
+        border-color: #007bff;
+    }
+
+    .upload-area.dragover {
+        border-color: #28a745;
+        background-color: rgba(40, 167, 69, 0.1);
+    }
+
+    .file-info {
+        margin-top: 20px;
+        display: none;
+    }
+
+    .options-area {
+        margin-top: 20px;
+        display: none;
+    }
+
+    .btn-convert {
+        margin-top: 20px;
+        width: 100%;
+        padding: 10px;
+        font-size: 1.2rem;
+    }
+
+    .spinner-border {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>File Converter</h1>
+    <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+
+<div class="converter-container">
+    <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+        <i class="fas fa-cloud-upload-alt fa-3x mb-3 text-muted"></i>
+        <h3>Click or Drag to Upload</h3>
+        <p class="text-muted">Supported: PNG, JPG, WEBP, BMP, CSV, JSON, DOCX, PDF, MP4, MP3</p>
+        <input type="file" id="file-input" style="display: none" onchange="handleFileSelect(this)">
+    </div>
+
+    <div class="file-info" id="file-info">
+        <h5 id="filename"></h5>
+        <div class="options-area" id="options-area">
+            <label for="format-select" class="form-label">Convert to:</label>
+            <select class="form-select" id="format-select"></select>
+            <button class="btn btn-primary btn-convert" onclick="convertFile()">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"
+                    id="loading-spinner"></span>
+                <span id="btn-text">Convert & Download</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentFileId = null;
+    let currentExt = null;
+    let currentFilename = null;
+
+    const uploadArea = document.getElementById('upload-area');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => uploadArea.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('dragover'), false);
+    });
+
+    uploadArea.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        document.getElementById('file-input').files = files;
+        handleFileSelect(document.getElementById('file-input'));
+    }
+
+    async function handleFileSelect(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            currentFilename = file.name;
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/tools/converter/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    currentFileId = data.file_id;
+                    currentExt = data.file_ext;
+
+                    document.getElementById('filename').innerText = file.name;
+                    document.getElementById('file-info').style.display = 'block';
+
+                    const select = document.getElementById('format-select');
+                    select.innerHTML = '';
+
+                    if (data.options.length > 0) {
+                        data.options.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt;
+                            option.text = opt.toUpperCase();
+                            select.appendChild(option);
+                        });
+                        document.getElementById('options-area').style.display = 'block';
+                    } else {
+                        document.getElementById('options-area').style.display = 'none';
+                        alert('No conversion options available for this file type.');
+                    }
+                } else {
+                    alert('Upload failed.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred during upload.');
+            }
+        }
+    }
+
+    async function convertFile() {
+        const targetFormat = document.getElementById('format-select').value;
+        const btn = document.querySelector('.btn-convert');
+        const spinner = document.getElementById('loading-spinner');
+        const btnText = document.getElementById('btn-text');
+
+        btn.disabled = true;
+        spinner.style.display = 'inline-block';
+        btnText.innerText = 'Converting...';
+
+        const formData = new FormData();
+        formData.append('file_id', currentFileId);
+        formData.append('target_format', targetFormat);
+        formData.append('original_ext', currentExt);
+        formData.append('original_filename', currentFilename);
+
+        try {
+            const response = await fetch('/tools/converter/convert', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+
+                // Extract filename from Content-Disposition header
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `converted_${currentFileId}.${targetFormat}`;
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                    if (filenameMatch && filenameMatch.length === 2) {
+                        filename = filenameMatch[1];
+                    }
+                }
+                a.download = filename;
+
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } else {
+                const err = await response.json();
+                console.error('Conversion error:', err);
+                let errorMsg = 'Unknown error';
+                if (err.detail) {
+                    if (typeof err.detail === 'string') {
+                        errorMsg = err.detail;
+                    } else if (Array.isArray(err.detail)) {
+                        errorMsg = err.detail.map(e => `${e.loc.join('.')}: ${e.msg}`).join('\n');
+                    } else {
+                        errorMsg = JSON.stringify(err.detail);
+                    }
+                } else {
+                    errorMsg = JSON.stringify(err);
+                }
+                alert('Conversion failed:\n' + errorMsg);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred during conversion.');
+        } finally {
+            btn.disabled = false;
+            spinner.style.display = 'none';
+            btnText.innerText = 'Convert & Download';
+        }
+    }
+</script>
+{% endblock %}
