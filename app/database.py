@@ -15,7 +15,7 @@ import time
 from sqlalchemy.exc import OperationalError
 
 def wait_for_db():
-    retries = 5
+    retries = 30
     while retries > 0:
         try:
             # Try to connect

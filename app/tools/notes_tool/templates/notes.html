@@ -1,25 +1,271 @@
 {% extends "base.html" %}
 
-{% block content %}
-<h1>My Notes</h1>
-<a href="/dashboard" class="btn btn-secondary mb-3">Back to Dashboard</a>
+{% block head %}
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+    .notes-container {
+        position: relative;
+        width: 100%;
+        height: 80vh;
+        /* Fixed height for canvas area */
+        overflow: hidden;
+        background-color: rgba(0, 0, 0, 0.02);
+        /* Subtle background to show area */
+        border-radius: 10px;
+    }
 
-<div class="card p-3 mb-4">
-    <form action="/tools/notes/add" method="post">
-        <div class="input-group">
-            <input type="text" name="content" class="form-control" placeholder="Write a note..." required>
-            <button class="btn btn-primary" type="submit">Add Note</button>
-        </div>
-    </form>
+    .note-card {
+        background-color: #ffeb3b;
+        width: 250px;
+        height: 250px;
+        padding: 15px;
+        box-shadow: 5px 5px 7px rgba(33, 33, 33, .7);
+        font-family: 'Patrick Hand', cursive;
+        font-size: 1.5rem;
+        transform: rotate(-2deg);
+        transition: box-shadow 0.2s;
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        /* Changed to absolute for drag */
+        resize: both;
+        overflow: hidden;
+        min-width: 150px;
+        min-height: 150px;
+        cursor: grab;
+        color: #212529 !important;
+        /* Force black text for visibility */
+    }
+
+    .note-card:active {
+        cursor: grabbing;
+        z-index: 100 !important;
+        /* Bring to front when dragging */
+    }
+
+    .note-card:hover {
+        z-index: 10;
+        box-shadow: 10px 10px 15px rgba(0, 0, 0, .5);
+    }
+
+    .note-content {
+        flex-grow: 1;
+        outline: none;
+        overflow-y: auto;
+        cursor: text;
+    }
+
+    .delete-btn {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: none;
+        border: none;
+        color: #555;
+        font-size: 1.2rem;
+        cursor: pointer;
+        opacity: 0.5;
+        transition: opacity 0.2s;
+        z-index: 5;
+    }
+
+    .delete-btn:hover {
+        opacity: 1;
+        color: #d32f2f;
+    }
+
+    .add-btn-container {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        z-index: 100;
+    }
+
+    .btn-add-note {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        font-size: 30px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>My Notes</h1>
+    <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
 </div>
 
-<div class="list-group">
+<div class="notes-container" id="notes-container">
     {% for note in notes %}
-    <div class="list-group-item">
-        {{ note }}
+    <div class="note-card" id="note-{{ note.id }}"
+        style="width: {{ note.width }}; height: {{ note.height }}; background-color: {{ note.color }}; left: {{ note.x }}px; top: {{ note.y }}px;">
+        <button class="delete-btn" onmousedown="event.stopPropagation()"
+            onclick="deleteNote('{{ note.id }}')">×</button>
+        <div class="note-content" contenteditable="true" onmousedown="event.stopPropagation()"
+            oninput="updateNote('{{ note.id }}', this)">{{ note.content }}</div>
     </div>
-    {% else %}
-    <div class="alert alert-info">No notes yet.</div>
     {% endfor %}
 </div>
+
+<div class="add-btn-container">
+    <button class="btn btn-primary btn-add-note" onclick="addNote()">+</button>
+</div>
+
+<script>
+    let timeoutId;
+    let isDragging = false;
+    let currentNote = null;
+    let offset = { x: 0, y: 0 };
+
+    // Drag Logic
+    document.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.note-card') && !e.target.closest('.note-content') && !e.target.closest('.delete-btn')) {
+            isDragging = true;
+            currentNote = e.target.closest('.note-card');
+            offset.x = e.clientX - currentNote.offsetLeft;
+            offset.y = e.clientY - currentNote.offsetTop;
+            currentNote.style.zIndex = 100; // Bring to front
+        }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isDragging && currentNote) {
+            e.preventDefault();
+            const container = document.getElementById('notes-container');
+            let newX = e.clientX - offset.x;
+            let newY = e.clientY - offset.y;
+
+            // Boundaries
+            if (newX < 0) newX = 0;
+            if (newY < 0) newY = 0;
+            if (newX + currentNote.offsetWidth > container.offsetWidth) newX = container.offsetWidth - currentNote.offsetWidth;
+            if (newY + currentNote.offsetHeight > container.offsetHeight) newY = container.offsetHeight - currentNote.offsetHeight;
+
+            currentNote.style.left = newX + 'px';
+            currentNote.style.top = newY + 'px';
+        }
+    });
+
+    document.addEventListener('mouseup', async () => {
+        if (isDragging && currentNote) {
+            isDragging = false;
+            const id = currentNote.id.replace('note-', '');
+            const x = parseInt(currentNote.style.left);
+            const y = parseInt(currentNote.style.top);
+
+            // Save position
+            try {
+                await fetch(`/tools/notes/update/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ x, y })
+                });
+            } catch (error) {
+                console.error('Error saving position:', error);
+            }
+
+            currentNote.style.zIndex = ''; // Reset z-index
+            currentNote = null;
+        }
+    });
+
+    async function addNote() {
+        try {
+            const response = await fetch('/tools/notes/add', { method: 'POST' });
+            if (response.ok) {
+                const note = await response.json();
+                const container = document.getElementById('notes-container');
+                const noteEl = document.createElement('div');
+                noteEl.className = 'note-card';
+                noteEl.id = `note-${note.id}`;
+                noteEl.style.width = note.width;
+                noteEl.style.height = note.height;
+                noteEl.style.backgroundColor = note.color;
+                noteEl.style.left = note.x + 'px';
+                noteEl.style.top = note.y + 'px';
+                noteEl.innerHTML = `
+                    <button class="delete-btn" onmousedown="event.stopPropagation()" onclick="deleteNote('${note.id}')">×</button>
+                    <div class="note-content" contenteditable="true" onmousedown="event.stopPropagation()" oninput="updateNote('${note.id}', this)"></div>
+                `;
+                container.appendChild(noteEl);
+                noteEl.querySelector('.note-content').focus();
+                resizeObserver.observe(noteEl);
+                updateFontSize(noteEl); // Initial calculation for new note
+            }
+        } catch (error) {
+            console.error('Error adding note:', error);
+        }
+    }
+
+    function updateNote(id, element) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(async () => {
+            const content = element.innerText;
+            const card = document.getElementById(`note-${id}`);
+            const width = card.style.width;
+            const height = card.style.height;
+
+            try {
+                await fetch(`/tools/notes/update/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, width, height })
+                });
+            } catch (error) {
+                console.error('Error updating note:', error);
+            }
+        }, 500);
+    }
+
+    async function deleteNote(id) {
+        if (!confirm('Are you sure you want to delete this note?')) return;
+
+        try {
+            const response = await fetch(`/tools/notes/delete/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                document.getElementById(`note-${id}`).remove();
+            }
+        } catch (error) {
+            console.error('Error deleting note:', error);
+        }
+    }
+
+    function updateFontSize(card) {
+        const width = card.offsetWidth;
+        const height = card.offsetHeight;
+        // Calculate font size: average of width/height divided by factor, min 16px
+        const newFontSize = Math.max(16, (width + height) / 20);
+        card.style.fontSize = newFontSize + 'px';
+    }
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            const card = entry.target;
+            const id = card.id.replace('note-', '');
+
+            // Update font size immediately
+            updateFontSize(card);
+
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(async () => {
+                const content = card.querySelector('.note-content').innerText;
+                const width = card.style.width;
+                const height = card.style.height;
+
+                await fetch(`/tools/notes/update/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, width, height })
+                });
+            }, 1000);
+        }
+    });
+
+    document.querySelectorAll('.note-card').forEach(card => {
+        resizeObserver.observe(card);
+        updateFontSize(card); // Initial calculation
+    });
+</script>
 {% endblock %}

@@ -20,6 +20,9 @@ app.include_router(dashboard.router)
 from .tools.notes_tool import router as notes_router
 app.include_router(notes_router.router)
 
+from .tools.converter_tool import router as converter_router
+app.include_router(converter_router.router)
+
 @app.get("/")
 async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})

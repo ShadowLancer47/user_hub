@@ -1,17 +1,86 @@
 {% extends "base.html" %}
 
-{% block content %}
-<h1>My Dashboard</h1>
-<p>Select tools to add to your workspace.</p>
+{% block head %}
+<style>
+    .dashboard-header {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
 
-<div class="row">
-    <!-- Tool List will go here -->
-    <div class="col-md-4">
-        <div class="card p-3">
-            <h5>Notes Tool</h5>
-            <p>A simple tool to take notes.</p>
-            <a href="/tools/notes" class="btn btn-primary">Open</a>
-        </div>
+    .dashboard-header h1 {
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .tool-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .tool-card {
+        background-color: var(--card-bg);
+        border-radius: 15px;
+        padding: 2rem;
+        text-align: center;
+        transition: transform 0.3s, box-shadow 0.3s;
+        text-decoration: none;
+        color: var(--text-color);
+        display: block;
+        height: 100%;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .tool-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        color: var(--text-color);
+    }
+
+    .tool-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .tool-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .tool-desc {
+        font-size: 0.9rem;
+        opacity: 0.8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h1>Welcome to User Hub</h1>
+    <p class="lead">Your personal workspace for productivity tools.</p>
+</div>
+
+<div class="tool-grid">
+    <!-- Notes Tool -->
+    <a href="/tools/notes" class="tool-card">
+        <div class="tool-icon">📝</div>
+        <div class="tool-title">Sticky Notes</div>
+        <div class="tool-desc">Capture your thoughts on digital post-it notes. Drag, resize, and organize freely.</div>
+    </a>
+
+    <!-- File Converter Tool -->
+    <a href="/tools/converter" class="tool-card">
+        <div class="tool-icon">🔄</div>
+        <div class="tool-title">File Converter</div>
+        <div class="tool-desc">Convert images (PNG, JPG, WEBP) and data files (CSV, JSON) easily.</div>
+    </a>
+
+    <!-- Placeholder for future tools -->
+    <div class="tool-card" style="opacity: 0.5; cursor: default;">
+        <div class="tool-icon">🔜</div>
+        <div class="tool-title">Coming Soon</div>
+        <div class="tool-desc">More amazing tools are being built. Stay tuned!</div>
     </div>
 </div>
 {% endblock %}
