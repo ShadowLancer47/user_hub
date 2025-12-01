@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block head %}
+<!-- Quill CSS -->
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<!-- html2pdf -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- html-docx-js (using a reliable CDN or fallback method) -->
+<!-- We will use a simple Blob method for DOCX/Word export for maximum compatibility without heavy libs -->
+<style>
+    #editor-container {
+        height: calc(100vh - 200px);
+        font-family: 'Georgia', serif;
+        font-size: 1.1rem;
+        background: var(--card-bg);
+        color: var(--text-color);
+        border: 1px solid white !important;
+        border-top: none !important;
+        border-radius: 0 0 8px 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .ql-toolbar {
+        background: var(--card-bg);
+        border: 1px solid white !important;
+        border-bottom: 1px solid white !important;
+        border-radius: 8px 8px 0 0;
+        padding: 12px !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+
+    .ql-container {
+        border: none !important;
+        font-family: inherit;
+    }
+
+    .ql-editor {
+        padding: 30px 40px;
+        color: var(--text-color);
+    }
+
+    /* Toolbar buttons */
+    .ql-snow .ql-toolbar button {
+        border-radius: 4px;
+        margin-right: 2px;
+        transition: background-color 0.2s;
+    }
+
+    .ql-snow .ql-toolbar button:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: var(--bs-primary);
+    }
+
+    .ql-snow .ql-toolbar button.ql-active {
+        background-color: rgba(255, 255, 255, 0.2);
+        color: var(--bs-primary);
+    }
+
+    /* Dropdowns */
+    .ql-snow .ql-toolbar .ql-picker-label {
+        border-radius: 4px;
+        transition: background-color 0.2s;
+        color: var(--text-color);
+    }
+
+    .ql-snow .ql-toolbar .ql-picker-label:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Force dropdown colors */
+    .ql-picker-options {
+        background-color: var(--card-bg) !important;
+        border: 1px solid white !important;
+        color: var(--text-color) !important;
+    }
+
+    .ql-picker-item {
+        color: var(--text-color) !important;
+    }
+
+    .ql-picker-item:hover {
+        color: var(--bs-primary) !important;
+        background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* Fix icons for dark mode */
+    .ql-snow .ql-stroke {
+        stroke: var(--text-color) !important;
+    }
+
+    .ql-snow .ql-fill {
+        fill: var(--text-color) !important;
+    }
+
+    .ql-snow .ql-picker {
+        color: var(--text-color) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid h-100 d-flex flex-column" style="min-height: 80vh;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <input type="text" id="doc-title" class="form-control form-control-lg border-0 bg-transparent fw-bold"
+            value="{{ note.title|default('Untitled') }}" placeholder="Untitled Document"
+            style="font-size: 2rem; width: auto; min-width: 300px;">
+
+        <div class="d-flex align-items-center gap-2">
+            <span id="save-status" class="text-muted small me-2">Saved</span>
+
+            <div class="dropdown">
+                <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    Export
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="exportPDF()">PDF (.pdf)</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportDOCX()">Word (.docx)</a></li>
+                </ul>
+            </div>
+
+            <a href="/tools/notes/list/doc" class="btn btn-outline-secondary">Close</a>
+        </div>
+    </div>
+
+    <div class="flex-grow-1">
+        <div id="editor-container"></div>
+        <div id="counter" class="mt-2 text-end" style="color: var(--text-color); opacity: 0.7; font-size: 0.9rem;">
+            Words: 0 | Characters: 0
+        </div>
+    </div>
+
+    <!-- Include Quill library -->
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        var quill = new Quill('#editor-container', {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    [{ 'font': [] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'color': [] }, { 'background': [] }],
+                    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['clean']
+                ]
+            }
+        });
+
+        // Load content
+        try {
+            const content = `{{ note.content | safe }}`;
+            if (content) {
+                quill.root.innerHTML = content;
+            }
+        } catch (e) {
+            console.error("Error loading content", e);
+        }
+
+        // Word Count Logic
+        function updateCounter() {
+            const text = quill.getText();
+            // Quill always adds a trailing newline, so we subtract 1 from length if text is not empty
+            const charCount = Math.max(0, text.length - 1);
+
+            // Split by whitespace and filter empty strings
+            const wordCount = text.trim().length === 0 ? 0 : text.trim().split(/\s+/).length;
+
+            document.getElementById('counter').innerText = `Words: ${wordCount} | Characters: ${charCount}`;
+        }
+
+        quill.on('text-change', function () {
+            updateCounter();
+            save();
+        });
+
+        // Initial count
+        updateCounter();
+
+        // Auto-save logic
+        let timeoutId;
+        const noteId = "{{ note.id }}";
+        const statusEl = document.getElementById('save-status');
+        const titleEl = document.getElementById('doc-title');
+
+        function save() {
+            statusEl.innerText = "Saving...";
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(async () => {
+                try {
+                    // Save the HTML content
+                    const content = quill.root.innerHTML;
+
+                    await fetch(`/tools/notes/update/${noteId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            title: titleEl.value,
+                            content: content
+                        })
+                    });
+                    statusEl.innerText = "Saved";
+                } catch (error) {
+                    statusEl.innerText = "Error saving";
+                    console.error(error);
+                }
+            }, 1000);
+        }
+
+        titleEl.addEventListener('input', save);
+        quill.on('text-change', save);
+
+        // Export Functions
+        function exportPDF() {
+            const element = document.getElementById('editor-container').querySelector('.ql-editor');
+            const opt = {
+                margin: 1,
+                filename: (titleEl.value || 'document') + '.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+
+        function exportDOCX() {
+            const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
+                "xmlns:w='urn:schemas-microsoft-com:office:word' " +
+                "xmlns='http://www.w3.org/TR/REC-html40'>" +
+                "<head><meta charset='utf-8'><title>Export HTML to Word Document with JavaScript</title></head><body>";
+
+            const footer = "</body></html>";
+            const sourceHTML = header + document.getElementById('editor-container').querySelector('.ql-editor').innerHTML + footer;
+
+            const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+            const fileDownload = document.createElement("a");
+            document.body.appendChild(fileDownload);
+            fileDownload.href = source;
+            fileDownload.download = (titleEl.value || 'document') + '.doc'; // .doc is more reliable for HTML content
+            fileDownload.click();
+            document.body.removeChild(fileDownload);
+        }
+    </script>
+    {% endblock %}

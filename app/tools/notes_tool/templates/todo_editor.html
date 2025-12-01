@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block head %}
+<!-- SortableJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<style>
+    /* Fix visibility for checked items in dark mode */
+    .list-group-item.completed {
+        background-color: rgba(0, 0, 0, 0.05) !important;
+        opacity: 0.7;
+    }
+
+    [data-bs-theme="dark"] .list-group-item.completed {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+    }
+
+    .list-group-item.completed .todo-text {
+        text-decoration: line-through;
+        color: var(--text-color);
+        opacity: 0.6;
+    }
+
+    /* Drag handle cursor */
+    .list-group-item {
+        cursor: grab;
+    }
+
+    .list-group-item:active {
+        cursor: grabbing;
+    }
+
+    /* Deadline input styling */
+    #deadline-input {
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-color);
+        padding: 5px 10px;
+        border-radius: 5px;
+        transition: all 0.2s;
+    }
+
+    #deadline-input:hover,
+    #deadline-input:focus {
+        border-color: var(--bs-primary);
+        background: var(--card-bg);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex flex-column">
+            <input type="text" id="todo-title" class="form-control form-control-lg border-0 bg-transparent fw-bold p-0"
+                value="{{ note.title|default('Untitled List') }}" placeholder="Untitled List" style="font-size: 2rem;">
+
+            <div class="d-flex align-items-center mt-2">
+                <small class="text-muted me-2">Deadline:</small>
+                <input type="date" id="deadline-input" value="{{ note.deadline|default('') }}">
+            </div>
+        </div>
+
+        <div>
+            <span id="save-status" class="text-muted small me-3">Saved</span>
+            <a href="/tools/notes/list/todo" class="btn btn-outline-secondary">Close</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="input-group mb-3">
+                <input type="text" id="new-todo-input" class="form-control form-control-lg"
+                    placeholder="Add a new task..." onkeypress="if(event.key==='Enter') addTodo()">
+                <button class="btn btn-primary btn-lg" onclick="addTodo()">Add</button>
+            </div>
+
+            <div id="todo-list" class="list-group list-group-flush">
+                <!-- Items injected by JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let timeoutId;
+    const noteId = "{{ note.id }}";
+    const statusEl = document.getElementById('save-status');
+    const titleEl = document.getElementById('todo-title');
+    const deadlineEl = document.getElementById('deadline-input');
+    let todos = [];
+
+    try {
+        todos = JSON.parse(`{{ note.content | safe }}`);
+    } catch (e) {
+        todos = [];
+    }
+
+    function render() {
+        const list = document.getElementById('todo-list');
+        list.innerHTML = '';
+        todos.forEach((todo, index) => {
+            const item = document.createElement('div');
+            item.className = `list-group-item d-flex align-items-center p-3 ${todo.done ? 'completed' : ''}`;
+            item.setAttribute('data-id', index); // For SortableJS
+            item.innerHTML = `
+                <i class="fas fa-grip-vertical text-muted me-3" style="cursor: grab; opacity: 0.5;"></i>
+                <input class="form-check-input me-3" type="checkbox" style="width: 1.5em; height: 1.5em;" 
+                       ${todo.done ? 'checked' : ''} onchange="toggle(${index})">
+                <span class="flex-grow-1 todo-text" style="font-size: 1.1rem;">
+                    ${todo.text}
+                </span>
+                <button class="btn btn-outline-danger btn-sm opacity-50" onclick="remove(${index})">×</button>
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    function save() {
+        statusEl.innerText = "Saving...";
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(async () => {
+            try {
+                await fetch(`/tools/notes/update/${noteId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: titleEl.value,
+                        content: JSON.stringify(todos),
+                        deadline: deadlineEl.value
+                    })
+                });
+                statusEl.innerText = "Saved";
+            } catch (error) {
+                statusEl.innerText = "Error saving";
+                console.error(error);
+            }
+        }, 1000);
+    }
+
+    function addTodo() {
+        const input = document.getElementById('new-todo-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        todos.push({ text, done: false });
+        input.value = '';
+        render();
+        save();
+    }
+
+    function toggle(index) {
+        todos[index].done = !todos[index].done;
+        render();
+        save();
+    }
+
+    function remove(index) {
+        todos.splice(index, 1);
+        render();
+        save();
+    }
+
+    titleEl.addEventListener('input', save);
+    deadlineEl.addEventListener('change', save);
+
+    // Initialize SortableJS
+    new Sortable(document.getElementById('todo-list'), {
+        animation: 150,
+        handle: '.list-group-item', // Drag by the whole item
+        onEnd: function (evt) {
+            // Reorder array based on new DOM order
+            const itemEl = evt.item;
+            const newIndex = evt.newIndex;
+            const oldIndex = evt.oldIndex;
+
+            // Move item in array
+            const item = todos.splice(oldIndex, 1)[0];
+            todos.splice(newIndex, 0, item);
+
+            // Re-render to ensure indices are correct for toggle/remove
+            render();
+            save();
+        }
+    });
+
+    render();
+</script>
+{% endblock %}

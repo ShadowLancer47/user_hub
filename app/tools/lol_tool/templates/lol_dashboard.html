@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <h1 class="mb-4">League of Legends Builds</h1>
+            <div class="input-group mb-5">
+                <input type="text" id="champion-search" class="form-control form-control-lg"
+                    placeholder="Enter Champion Name (e.g., Ahri, Yasuo)...">
+                <button class="btn btn-primary btn-lg" onclick="searchChampion()">Search</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading" class="text-center d-none">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Scraping data...</p>
+    </div>
+
+    <div id="results-container" class="d-none">
+        <!-- Results will be injected here -->
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h2 id="champ-name" class="text-capitalize"></h2>
+                <img id="champ-icon" src="" alt="Champion Icon" class="rounded-circle mb-3"
+                    style="width: 100px; height: 100px;">
+
+                <hr>
+
+                <div class="row text-start">
+                    <div class="col-md-6">
+                        <h4>Builds</h4>
+                        <div id="builds-list" class="d-flex flex-wrap gap-2"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <h4>Runes</h4>
+                        <div id="runes-list"></div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="row text-start">
+                    <div class="col-md-6">
+                        <h4>Skill Order</h4>
+                        <div id="skills-list"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <h4>Matchups</h4>
+                        <div id="matchups-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="error-message" class="alert alert-danger d-none mt-3" role="alert"></div>
+</div>
+
+<script>
+    async function searchChampion() {
+        const input = document.getElementById('champion-search');
+        const champion = input.value.trim();
+        if (!champion) return;
+
+        // UI Reset
+        document.getElementById('loading').classList.remove('d-none');
+        document.getElementById('results-container').classList.add('d-none');
+        document.getElementById('error-message').classList.add('d-none');
+
+        try {
+            const response = await fetch(`/tools/lol/search?champion=${encodeURIComponent(champion)}`);
+            const data = await response.json();
+
+            if (response.ok) {
+                displayResults(data);
+            } else {
+                showError(data.error || "An error occurred");
+            }
+        } catch (error) {
+            showError("Failed to fetch data. Please try again.");
+            console.error(error);
+        } finally {
+            document.getElementById('loading').classList.add('d-none');
+        }
+    }
+
+    function displayResults(data) {
+        document.getElementById('champ-name').innerText = data.name;
+        document.getElementById('champ-icon').src = data.icon;
+
+        // Render Builds
+        const buildsList = document.getElementById('builds-list');
+        buildsList.innerHTML = '';
+        if (data.items && data.items.length > 0) {
+            data.items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'text-center';
+                div.style.width = '60px';
+                div.innerHTML = `
+                    <img src="${item.icon}" alt="${item.name}" class="rounded mb-1" style="width: 48px; height: 48px;" title="${item.name}">
+                    <div class="small text-truncate" style="max-width: 60px;">${item.name}</div>
+                `;
+                buildsList.appendChild(div);
+            });
+        } else {
+            buildsList.innerHTML = '<p class="text-muted">No build data found.</p>';
+        }
+
+        // Render Runes
+        const runesList = document.getElementById('runes-list');
+        runesList.innerHTML = '';
+        if (data.runes && (data.runes.primary.length > 0 || data.runes.secondary.length > 0)) {
+            let html = '<div class="d-flex gap-3">';
+
+            // Primary
+            html += '<div><h6>Primary</h6><div class="d-flex flex-wrap gap-1">';
+            data.runes.primary.forEach(rune => {
+                if (rune.icon) {
+                    html += `<img src="${rune.icon}" alt="${rune.name}" class="rounded-circle" style="width: 32px; height: 32px;" title="${rune.name}">`;
+                } else {
+                    html += `<span class="badge bg-secondary" title="${rune.name}">${rune.name}</span>`;
+                }
+            });
+            html += '</div></div>';
+
+            // Secondary
+            html += '<div><h6>Secondary</h6><div class="d-flex flex-wrap gap-1">';
+            data.runes.secondary.forEach(rune => {
+                if (rune.icon) {
+                    html += `<img src="${rune.icon}" alt="${rune.name}" class="rounded-circle" style="width: 32px; height: 32px;" title="${rune.name}">`;
+                } else {
+                    html += `<span class="badge bg-secondary" title="${rune.name}">${rune.name}</span>`;
+                }
+            });
+            html += '</div></div>';
+
+            html += '</div>';
+            runesList.innerHTML = html;
+        } else {
+            runesList.innerHTML = '<p class="text-muted">No rune data found.</p>';
+        }
+
+        // Render Skills
+        const skillsList = document.getElementById('skills-list');
+        if (data.skills && data.skills.length > 0) {
+            skillsList.innerHTML = data.skills.map(skill => `<span class="badge bg-info text-dark me-1">${skill}</span>`).join('');
+        } else {
+            skillsList.innerHTML = '<p class="text-muted">Skill data unavailable.</p>';
+        }
+
+        // Render Matchups
+        const matchupsList = document.getElementById('matchups-list');
+        if (data.matchups && (data.matchups.good.length > 0 || data.matchups.bad.length > 0)) {
+            let html = '<div class="row">';
+
+            // Good Against
+            html += '<div class="col-6"><h6>Good Against</h6><ul class="list-unstyled">';
+            data.matchups.good.forEach(champ => {
+                html += `<li><i class="fas fa-check text-success me-1"></i> ${champ}</li>`;
+            });
+            html += '</ul></div>';
+
+            // Bad Against
+            html += '<div class="col-6"><h6>Bad Against</h6><ul class="list-unstyled">';
+            data.matchups.bad.forEach(champ => {
+                html += `<li><i class="fas fa-times text-danger me-1"></i> ${champ}</li>`;
+            });
+            html += '</ul></div>';
+
+            html += '</div>';
+            matchupsList.innerHTML = html;
+        } else {
+            matchupsList.innerHTML = '<p class="text-muted">Matchup data unavailable.</p>';
+        }
+
+        document.getElementById('results-container').classList.remove('d-none');
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('error-message');
+        el.innerText = msg;
+        el.classList.remove('d-none');
+    }
+
+    // Enter key support
+    document.getElementById('champion-search').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            searchChampion();
+        }
+    });
+</script>
+{% endblock %}
