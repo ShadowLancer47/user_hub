@@ -7,15 +7,12 @@
         position: relative;
         width: 100%;
         height: 80vh;
-        /* Fixed height for canvas area */
         overflow: hidden;
         background-color: rgba(0, 0, 0, 0.02);
-        /* Subtle background to show area */
         border-radius: 10px;
     }
 
     .note-card {
-        background-color: #ffeb3b;
         width: 250px;
         height: 250px;
         padding: 15px;
@@ -27,20 +24,17 @@
         display: flex;
         flex-direction: column;
         position: absolute;
-        /* Changed to absolute for drag */
         resize: both;
         overflow: hidden;
         min-width: 150px;
         min-height: 150px;
         cursor: grab;
         color: #212529 !important;
-        /* Force black text for visibility */
     }
 
     .note-card:active {
         cursor: grabbing;
         z-index: 100 !important;
-        /* Bring to front when dragging */
     }
 
     .note-card:hover {
@@ -87,14 +81,18 @@
         border-radius: 50%;
         font-size: 30px;
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>My Notes</h1>
-    <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+    <h1>Sticky Notes</h1>
+    <a href="/tools/notes" class="btn btn-secondary">Back to Dashboard</a>
 </div>
 
 <div class="notes-container" id="notes-container">
@@ -122,11 +120,17 @@
     // Drag Logic
     document.addEventListener('mousedown', (e) => {
         if (e.target.closest('.note-card') && !e.target.closest('.note-content') && !e.target.closest('.delete-btn')) {
-            isDragging = true;
-            currentNote = e.target.closest('.note-card');
-            offset.x = e.clientX - currentNote.offsetLeft;
-            offset.y = e.clientY - currentNote.offsetTop;
-            currentNote.style.zIndex = 100; // Bring to front
+            const card = e.target.closest('.note-card');
+            const rect = card.getBoundingClientRect();
+            const isResizeHandle = (e.clientX > rect.right - 20 && e.clientY > rect.bottom - 20);
+
+            if (!isResizeHandle) {
+                isDragging = true;
+                currentNote = card;
+                offset.x = e.clientX - currentNote.offsetLeft;
+                offset.y = e.clientY - currentNote.offsetTop;
+                currentNote.style.zIndex = 100; // Bring to front
+            }
         }
     });
 
@@ -173,7 +177,11 @@
 
     async function addNote() {
         try {
-            const response = await fetch('/tools/notes/add', { method: 'POST' });
+            const response = await fetch('/tools/notes/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note_type: 'sticky' })
+            });
             if (response.ok) {
                 const note = await response.json();
                 const container = document.getElementById('notes-container');
@@ -192,7 +200,6 @@
                 container.appendChild(noteEl);
                 noteEl.querySelector('.note-content').focus();
                 resizeObserver.observe(noteEl);
-                updateFontSize(noteEl); // Initial calculation for new note
             }
         } catch (error) {
             console.error('Error adding note:', error);

@@ -19,8 +19,11 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://userhub:userhub_secret@db/userhub_db
+      - RIOT_API_KEY=RGAPI-72c561c9-ca10-4667-a190-986e0887398c
     depends_on:
       - db
 
 volumes:
   postgres_data:
+  
+

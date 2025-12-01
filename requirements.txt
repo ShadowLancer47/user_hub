@@ -14,3 +14,8 @@ python-jose[cryptography]
 Pillow
 pdf2docx
 opencv-python-headless
+requests
+beautifulsoup4
+pydub
+markdown
+httpx
