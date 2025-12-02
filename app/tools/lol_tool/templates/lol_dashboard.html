@@ -1,14 +1,56 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    .suggestions-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: #2b3035;
+        border: 1px solid #495057;
+        border-radius: 0.375rem;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5);
+        max-height: 300px;
+        overflow-y: auto;
+        display: none;
+        color: #f8f9fa;
+    }
+
+    .suggestion-item {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: background-color 0.2s;
+    }
+
+    .suggestion-item:hover {
+        background-color: #343a40;
+    }
+
+    .suggestion-item img {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+</style>
+
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-8 text-center">
-            <h1 class="mb-4">League of Legends Builds</h1>
-            <div class="input-group mb-5">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="mb-0">League of Legends Builds</h1>
+                <a href="/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
+            </div>
+            <div class="input-group mb-5 position-relative">
                 <input type="text" id="champion-search" class="form-control form-control-lg"
-                    placeholder="Enter Champion Name (e.g., Ahri, Yasuo)...">
+                    placeholder="Enter Champion Name (e.g., Ahri, Yasuo)..." autocomplete="off">
                 <button class="btn btn-primary btn-lg" onclick="searchChampion()">Search</button>
+                <div id="suggestions" class="suggestions-dropdown text-start"></div>
             </div>
         </div>
     </div>
@@ -61,10 +103,81 @@
 </div>
 
 <script>
+    let champions = [];
+
+    // Fetch champion list for autofill
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            // Get latest version
+            const verRes = await fetch('https://ddragon.leagueoflegends.com/api/versions.json');
+            const versions = await verRes.json();
+            const latest = versions[0];
+
+            // Get champions
+            const champRes = await fetch(`https://ddragon.leagueoflegends.com/cdn/${latest}/data/en_US/champion.json`);
+            const champData = await champRes.json();
+
+            // Store champions with icon URLs
+            champions = Object.values(champData.data).map(c => ({
+                name: c.name,
+                id: c.id,
+                icon: `https://ddragon.leagueoflegends.com/cdn/${latest}/img/champion/${c.image.full}`
+            }));
+        } catch (e) {
+            console.error("Failed to load champion list for autofill", e);
+        }
+    });
+
+    // Custom Autofill Logic
+    const searchInput = document.getElementById('champion-search');
+    const suggestionsBox = document.getElementById('suggestions');
+
+    searchInput.addEventListener('input', () => {
+        const query = searchInput.value.toLowerCase().trim();
+        suggestionsBox.innerHTML = '';
+
+        if (query.length < 1) {
+            suggestionsBox.style.display = 'none';
+            return;
+        }
+
+        const matches = champions.filter(c => c.name.toLowerCase().includes(query));
+
+        if (matches.length > 0) {
+            matches.forEach(champ => {
+                const div = document.createElement('div');
+                div.className = 'suggestion-item';
+                div.innerHTML = `
+                    <img src="${champ.icon}" alt="${champ.name}">
+                    <span>${champ.name}</span>
+                `;
+                div.onclick = () => {
+                    searchInput.value = champ.name;
+                    suggestionsBox.style.display = 'none';
+                    searchChampion();
+                };
+                suggestionsBox.appendChild(div);
+            });
+            suggestionsBox.style.display = 'block';
+        } else {
+            suggestionsBox.style.display = 'none';
+        }
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+            suggestionsBox.style.display = 'none';
+        }
+    });
+
     async function searchChampion() {
         const input = document.getElementById('champion-search');
         const champion = input.value.trim();
         if (!champion) return;
+
+        // Hide suggestions if open
+        document.getElementById('suggestions').style.display = 'none';
 
         // UI Reset
         document.getElementById('loading').classList.remove('d-none');
@@ -81,7 +194,7 @@
                 showError(data.error || "An error occurred");
             }
         } catch (error) {
-            showError("Failed to fetch data. Please try again.");
+            showError(`Failed to fetch data: ${error.message}`);
             console.error(error);
         } finally {
             document.getElementById('loading').classList.add('d-none');
@@ -95,18 +208,43 @@
         // Render Builds
         const buildsList = document.getElementById('builds-list');
         buildsList.innerHTML = '';
-        if (data.items && data.items.length > 0) {
-            data.items.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'text-center';
-                div.style.width = '60px';
-                div.innerHTML = `
-                    <img src="${item.icon}" alt="${item.name}" class="rounded mb-1" style="width: 48px; height: 48px;" title="${item.name}">
-                    <div class="small text-truncate" style="max-width: 60px;">${item.name}</div>
-                `;
-                buildsList.appendChild(div);
+
+        const categories = [
+            { key: 'starting', label: 'Starting Items' },
+            { key: 'early', label: 'Early Items' },
+            { key: 'core', label: 'Core Items' },
+            { key: 'final', label: 'Final Items' },
+            { key: 'boots', label: 'Boots' }
+        ];
+
+        if (data.items) {
+            categories.forEach(cat => {
+                if (data.items[cat.key] && data.items[cat.key].length > 0) {
+                    const catDiv = document.createElement('div');
+                    catDiv.className = 'mb-3 w-100';
+                    catDiv.innerHTML = `<h6 class="text-muted small text-uppercase fw-bold mb-2">${cat.label}</h6>`;
+
+                    const itemsContainer = document.createElement('div');
+                    itemsContainer.className = 'd-flex flex-wrap gap-2';
+
+                    data.items[cat.key].forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'text-center';
+                        div.style.width = '60px';
+                        div.innerHTML = `
+                <img src="${item.icon}" alt="${item.name}" class="rounded mb-1" style="width: 48px; height: 48px;" title="${item.name}">
+                <div class="small text-truncate" style="max-width: 60px; font-size: 0.7rem;">${item.name}</div>
+            `;
+                        itemsContainer.appendChild(div);
+                    });
+
+                    catDiv.appendChild(itemsContainer);
+                    buildsList.appendChild(catDiv);
+                }
             });
-        } else {
+        }
+
+        if (buildsList.children.length === 0) {
             buildsList.innerHTML = '<p class="text-muted">No build data found.</p>';
         }
 
@@ -114,31 +252,46 @@
         const runesList = document.getElementById('runes-list');
         runesList.innerHTML = '';
         if (data.runes && (data.runes.primary.length > 0 || data.runes.secondary.length > 0)) {
-            let html = '<div class="d-flex gap-3">';
+            let html = '<div class="row">';
 
-            // Primary
-            html += '<div><h6>Primary</h6><div class="d-flex flex-wrap gap-1">';
+            // Primary (Left Column)
+            html += '<div class="col-4 text-center border-end"><h6>Primary</h6><div class="d-flex flex-column align-items-center gap-2">';
             data.runes.primary.forEach(rune => {
                 if (rune.icon) {
-                    html += `<img src="${rune.icon}" alt="${rune.name}" class="rounded-circle" style="width: 32px; height: 32px;" title="${rune.name}">`;
+                    html += `<img src="${rune.icon}" alt="${rune.name}" class="rounded-circle" style="width: 48px; height: 48px;" title="${rune.name}">`;
                 } else {
                     html += `<span class="badge bg-secondary" title="${rune.name}">${rune.name}</span>`;
                 }
             });
             html += '</div></div>';
 
-            // Secondary
-            html += '<div><h6>Secondary</h6><div class="d-flex flex-wrap gap-1">';
+            // Secondary (Middle Column)
+            html += '<div class="col-4 text-center border-end"><h6>Secondary</h6><div class="d-flex flex-column align-items-center gap-2">';
             data.runes.secondary.forEach(rune => {
                 if (rune.icon) {
-                    html += `<img src="${rune.icon}" alt="${rune.name}" class="rounded-circle" style="width: 32px; height: 32px;" title="${rune.name}">`;
+                    html += `<img src="${rune.icon}" alt="${rune.name}" class="rounded-circle" style="width: 40px; height: 40px;" title="${rune.name}">`;
                 } else {
                     html += `<span class="badge bg-secondary" title="${rune.name}">${rune.name}</span>`;
                 }
             });
             html += '</div></div>';
 
-            html += '</div>';
+            // Stats (Right Column)
+            html += '<div class="col-4 text-center"><h6>Stats</h6><div class="d-flex flex-column align-items-center gap-2">';
+            if (data.runes.stats && data.runes.stats.length > 0) {
+                data.runes.stats.forEach(rune => {
+                    if (rune.icon) {
+                        html += `<img src="${rune.icon}" alt="${rune.name}" class="rounded-circle" style="width: 32px; height: 32px;" title="${rune.name}">`;
+                    } else {
+                        html += `<span class="badge bg-secondary" title="${rune.name}">${rune.name}</span>`;
+                    }
+                });
+            } else {
+                html += '<span class="text-muted small">No stats</span>';
+            }
+            html += '</div></div>';
+
+            html += '</div>'; // End Row
             runesList.innerHTML = html;
         } else {
             runesList.innerHTML = '<p class="text-muted">No rune data found.</p>';
@@ -147,7 +300,22 @@
         // Render Skills
         const skillsList = document.getElementById('skills-list');
         if (data.skills && data.skills.length > 0) {
-            skillsList.innerHTML = data.skills.map(skill => `<span class="badge bg-info text-dark me-1">${skill}</span>`).join('');
+            let html = '<div class="d-flex align-items-center gap-2">';
+            data.skills.forEach((skill, index) => {
+                html += `
+                    <div class="position-relative text-center" style="width: 48px; height: 48px;">
+                        ${skill.icon ? `<img src="${skill.icon}" alt="${skill.key}" class="rounded border border-secondary" style="width: 100%; height: 100%; object-fit: cover;">` : '<div class="bg-secondary rounded" style="width: 100%; height: 100%;"></div>'}
+                        <div class="position-absolute top-50 start-50 translate-middle fw-bold text-white text-shadow" style="font-size: 1.2rem; text-shadow: 2px 2px 4px #000;">
+                            ${skill.key}
+                        </div>
+                    </div>
+                `;
+                if (index < data.skills.length - 1) {
+                    html += '<i class="fas fa-chevron-right text-muted"></i>';
+                }
+            });
+            html += '</div>';
+            skillsList.innerHTML = html;
         } else {
             skillsList.innerHTML = '<p class="text-muted">Skill data unavailable.</p>';
         }
@@ -160,14 +328,20 @@
             // Good Against
             html += '<div class="col-6"><h6>Good Against</h6><ul class="list-unstyled">';
             data.matchups.good.forEach(champ => {
-                html += `<li><i class="fas fa-check text-success me-1"></i> ${champ}</li>`;
+                html += `<li class="d-flex align-items-center mb-1">
+                    <img src="${champ.icon}" alt="${champ.name}" class="rounded-circle me-2" style="width: 24px; height: 24px;">
+                    <span>${champ.name}</span>
+                </li>`;
             });
             html += '</ul></div>';
 
             // Bad Against
             html += '<div class="col-6"><h6>Bad Against</h6><ul class="list-unstyled">';
             data.matchups.bad.forEach(champ => {
-                html += `<li><i class="fas fa-times text-danger me-1"></i> ${champ}</li>`;
+                html += `<li class="d-flex align-items-center mb-1">
+                    <img src="${champ.icon}" alt="${champ.name}" class="rounded-circle me-2" style="width: 24px; height: 24px;">
+                    <span>${champ.name}</span>
+                </li>`;
             });
             html += '</ul></div>';
 

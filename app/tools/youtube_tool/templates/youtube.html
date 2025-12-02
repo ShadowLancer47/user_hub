@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+        --glass-bg: rgba(255, 255, 255, 0.95);
+        --glass-border: rgba(255, 255, 255, 0.2);
+        --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.15);
+        --input-bg: #ffffff;
+        --input-border: #eee;
+        --input-text: #212529;
+        --card-surface: #ffffff;
+        --card-text: #1a1a1a;
+        --option-bg: #f8f9fa;
+        --option-hover: #ffffff;
+        --option-border: transparent;
+        --option-border-hover: #ddd;
+    }
+
+    [data-bs-theme="dark"] {
+        --glass-bg: rgba(33, 37, 41, 0.95);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --input-bg: #2b3035;
+        --input-border: #495057;
+        --input-text: #f8f9fa;
+        --card-surface: #2b3035;
+        --card-text: #f8f9fa;
+        --option-bg: #343a40;
+        --option-hover: #3d4246;
+        --option-border: transparent;
+        --option-border-hover: #495057;
+    }
+
+    .youtube-container {
+        max-width: 800px;
+        margin: 60px auto;
+        padding: 40px;
+        background: var(--glass-bg);
+        backdrop-filter: blur(10px);
+        border-radius: 24px;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--glass-border);
+        color: var(--text-color);
+    }
+
+    .header-section {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .header-section h1 {
+        font-weight: 800;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 10px;
+    }
+
+    .input-group-custom {
+        position: relative;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .input-group-custom input {
+        height: 60px;
+        font-size: 1.1rem;
+        border: 2px solid var(--input-border);
+        border-right: none;
+        padding-left: 25px;
+        border-radius: 12px 0 0 12px;
+        background-color: var(--input-bg);
+        color: var(--input-text);
+    }
+
+    .input-group-custom input:focus {
+        box-shadow: none;
+        border-color: #ff0000;
+        color: var(--input-text);
+    }
+
+    .btn-fetch {
+        background: var(--primary-gradient);
+        color: white;
+        font-weight: 600;
+        padding: 0 30px;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-fetch:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(255, 0, 0, 0.3);
+        color: white;
+    }
+
+    .video-info-card {
+        display: none;
+        background: var(--card-surface);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        animation: slideUp 0.5s ease;
+        color: var(--card-text);
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .thumbnail-wrapper {
+        position: relative;
+        width: 100%;
+        padding-top: 56.25%;
+        /* 16:9 Aspect Ratio */
+        background: #000;
+        overflow: hidden;
+    }
+
+    .thumbnail-wrapper img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .info-content {
+        padding: 30px;
+    }
+
+    .video-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        line-height: 1.4;
+        color: var(--card-text);
+    }
+
+    .options-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+
+    .option-card {
+        background: var(--option-bg);
+        padding: 15px;
+        border-radius: 12px;
+        border: 2px solid var(--option-border);
+        cursor: pointer;
+        transition: all 0.2s;
+        color: var(--card-text);
+    }
+
+    .option-card:hover {
+        background: var(--option-hover);
+        border-color: var(--option-border-hover);
+    }
+
+    .option-card.selected {
+        background: rgba(255, 0, 0, 0.05);
+        border-color: #ff0000;
+    }
+
+    [data-bs-theme="dark"] .option-card.selected {
+        background: rgba(255, 0, 0, 0.15);
+    }
+
+    .btn-download {
+        width: 100%;
+        padding: 15px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        background: #1a1a1a;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        transition: all 0.3s;
+    }
+
+    [data-bs-theme="dark"] .btn-download {
+        background: #f8f9fa;
+        color: #1a1a1a;
+    }
+
+    .btn-download:hover {
+        background: #333;
+        transform: translateY(-2px);
+    }
+
+    [data-bs-theme="dark"] .btn-download:hover {
+        background: #e9ecef;
+    }
+
+    .btn-download:disabled {
+        background: #ccc;
+        transform: none;
+    }
+
+    [data-bs-theme="dark"] .btn-download:disabled {
+        background: #495057;
+        color: #868e96;
+    }
+
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        border-radius: 16px;
+        color: #212529;
+    }
+
+    [data-bs-theme="dark"] .loading-overlay {
+        background: rgba(33, 37, 41, 0.9);
+        color: #f8f9fa;
+    }
+
+    .spinner-custom {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #ff0000;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    [data-bs-theme="dark"] .spinner-custom {
+        border-color: #495057;
+        border-top-color: #ff0000;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-end align-items-center mb-4 pt-4">
+        <a href="/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+
+    <div class="youtube-container">
+        <div class="header-section">
+            <i class="fab fa-youtube fa-4x text-danger mb-3"></i>
+            <h1>YouTube Downloader</h1>
+            <p class="text-muted lead">Download videos and audio in high quality</p>
+        </div>
+
+        <div class="input-group input-group-custom">
+            <input type="text" class="form-control" id="video-url" placeholder="Paste YouTube Link here...">
+            <button class="btn btn-fetch" onclick="fetchInfo()" id="btn-fetch">
+                Get Info
+            </button>
+        </div>
+
+        <div class="video-info-card" id="video-info-card">
+            <div class="loading-overlay" id="download-loading">
+                <div class="text-center">
+                    <div class="spinner-custom mb-3"></div>
+                    <h5 id="loading-text">Processing...</h5>
+                </div>
+            </div>
+
+            <div class="thumbnail-wrapper">
+                <img id="video-thumbnail" src="" alt="Video Thumbnail">
+            </div>
+
+            <div class="info-content">
+                <h3 class="video-title" id="video-title"></h3>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold mb-3">Select Format</label>
+                    <div class="options-grid">
+                        <div class="option-card selected" onclick="selectType('video')" id="type-video">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-video fa-lg me-2 text-danger"></i>
+                                <span class="fw-bold">Video (MP4)</span>
+                            </div>
+                            <select class="form-select form-select-sm" id="video-quality"
+                                onclick="event.stopPropagation()">
+                                <option value="best">Best Quality</option>
+                                <option value="1080p">1080p</option>
+                                <option value="720p">720p</option>
+                                <option value="480p">480p</option>
+                            </select>
+                        </div>
+
+                        <div class="option-card" onclick="selectType('audio')" id="type-audio">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-music fa-lg me-2 text-danger"></i>
+                                <span class="fw-bold">Audio (MP3)</span>
+                            </div>
+                            <div class="text-muted small mt-2">High Quality Audio</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-download" onclick="downloadMedia()" id="btn-download">
+                    <i class="fas fa-download me-2"></i>Download Now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentType = 'video';
+
+    function selectType(type) {
+        currentType = type;
+        document.querySelectorAll('.option-card').forEach(el => el.classList.remove('selected'));
+        document.getElementById(`type-${type}`).classList.add('selected');
+    }
+
+    async function fetchInfo() {
+        const url = document.getElementById('video-url').value;
+        const btn = document.getElementById('btn-fetch');
+
+        if (!url) return;
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        try {
+            const formData = new FormData();
+            formData.append('url', url);
+
+            const response = await fetch('/tools/youtube/info', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Failed to fetch video info');
+
+            const data = await response.json();
+
+            document.getElementById('video-thumbnail').src = data.thumbnail;
+            document.getElementById('video-title').innerText = data.title;
+            document.getElementById('video-info-card').style.display = 'block';
+
+        } catch (error) {
+            alert('Error fetching video info. Please check the URL.');
+            console.error(error);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Get Info';
+        }
+    }
+
+    async function downloadMedia() {
+        const url = document.getElementById('video-url').value;
+        const quality = document.getElementById('video-quality').value;
+        const loading = document.getElementById('download-loading');
+        const loadingText = document.getElementById('loading-text');
+
+        loading.style.display = 'flex';
+        loadingText.innerText = currentType === 'video' ? 'Downloading Video...' : 'Converting to Audio...';
+
+        try {
+            const formData = new FormData();
+            const title = document.getElementById('video-title').innerText;
+            formData.append('url', url);
+            formData.append('title', title);
+            formData.append('type', currentType);
+            formData.append('quality', quality);
+
+            const response = await fetch('/tools/youtube/download', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+
+                // Try to get filename from header
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = currentType === 'video' ? 'video.mp4' : 'audio.mp3';
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                    if (match && match[1]) filename = match[1];
+                }
+
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+            } else {
+                const err = await response.json();
+                throw new Error(err.detail || 'Download failed');
+            }
+        } catch (error) {
+            alert('Error downloading: ' + error.message);
+        } finally {
+            loading.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}

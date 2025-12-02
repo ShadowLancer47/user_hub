@@ -18,7 +18,12 @@ def lol_dashboard(request: Request):
 @router.get("/search")
 def search_champion(champion: str = Query(...)):
     """Search for champion data."""
-    data = scrape_champion(champion)
-    if not data:
-        return JSONResponse(content={"error": "Champion not found or data unavailable"}, status_code=404)
-    return JSONResponse(content=data)
+    try:
+        data = scrape_champion(champion)
+        if not data:
+            return JSONResponse(content={"error": "Champion not found or data unavailable"}, status_code=404)
+        return JSONResponse(content=data)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": f"Internal Server Error: {str(e)}"}, status_code=500)

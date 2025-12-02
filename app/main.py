@@ -26,6 +26,9 @@ app.include_router(converter_router.router)
 from .tools.lol_tool import router as lol_router
 app.include_router(lol_router.router)
 
+from .tools.youtube_tool import router as youtube_router
+app.include_router(youtube_router.router)
+
 @app.get("/")
 async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
